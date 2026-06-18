@@ -1,0 +1,3 @@
+kujira commit check
+
+This file verifies whether Codex can create a local Git commit before push.
