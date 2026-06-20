@@ -1,4 +1,16 @@
 (() => {
+  const foodImages = {
+    plankton: loadImage("assets/images/plankton.png"),
+    krill: loadImage("assets/images/krill.png"),
+    squid: loadImage("assets/images/squid.png")
+  };
+
+  function loadImage(src) {
+    const image = new Image();
+    image.src = src;
+    return image;
+  }
+
   function draw(ctx, game) {
     ctx.setTransform(game.dpr, 0, 0, game.dpr, 0, 0);
     ctx.clearRect(0, 0, game.screenWidth, game.screenHeight);
@@ -9,6 +21,12 @@
     ctx.translate(game.offsetX, game.offsetY);
     ctx.scale(game.scale, game.scale);
     drawWorld(ctx, game);
+    if (!game.started) {
+      drawTitle(ctx, game);
+      ctx.restore();
+      return;
+    }
+
     drawFoods(ctx, game);
     drawBubbles(ctx, game);
     drawWhale(ctx, game);
@@ -51,7 +69,9 @@
   function drawFoods(ctx, game) {
     for (const food of game.foods) {
       if (!food.active) continue;
-      if (food.type === "krill") {
+      if (food.type === "squid") {
+        drawSquid(ctx, food);
+      } else if (food.type === "krill") {
         drawKrill(ctx, food);
       } else {
         drawPlankton(ctx, food);
@@ -60,6 +80,8 @@
   }
 
   function drawPlankton(ctx, food) {
+    if (drawFoodImage(ctx, food, "plankton", 32, 32)) return;
+
     ctx.save();
     ctx.translate(food.x, food.y);
     ctx.scale(food.direction, 1);
@@ -88,6 +110,8 @@
   }
 
   function drawKrill(ctx, food) {
+    if (drawFoodImage(ctx, food, "krill", 42, 28, -food.direction)) return;
+
     ctx.save();
     ctx.translate(food.x, food.y);
     ctx.scale(food.direction, 1);
@@ -118,6 +142,55 @@
     ctx.arc(8.5, -1.4, 1.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  function drawSquid(ctx, food) {
+    if (drawFoodImage(ctx, food, "squid", 46, 38)) return;
+
+    ctx.save();
+    ctx.translate(food.x, food.y);
+    ctx.scale(food.direction, 1);
+
+    ctx.fillStyle = "#d9d0ff";
+    ctx.strokeStyle = "#51458f";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, 0);
+    ctx.lineTo(-2, -13);
+    ctx.lineTo(-14, -7);
+    ctx.lineTo(-14, 7);
+    ctx.lineTo(-2, 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = "#d9d0ff";
+    ctx.lineWidth = 2.2;
+    for (let i = -2; i <= 2; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(-12, i * 3);
+      ctx.quadraticCurveTo(-24, i * 5, -31, i * 3);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#211b42";
+    ctx.beginPath();
+    ctx.arc(5, -3.5, 2.2, 0, Math.PI * 2);
+    ctx.arc(5, 3.5, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFoodImage(ctx, food, type, width, height, facing = food.direction) {
+    const image = foodImages[type];
+    if (!image || !image.complete || image.naturalWidth === 0) return false;
+
+    ctx.save();
+    ctx.translate(food.x, food.y);
+    ctx.scale(facing, 1);
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    ctx.restore();
+    return true;
   }
 
   function drawBubbles(ctx, game) {
@@ -233,6 +306,48 @@
     ctx.font = "700 17px system-ui, sans-serif";
     ctx.fillText("Retry", game.width / 2, y + 153);
     ctx.textAlign = "left";
+  }
+
+  function drawTitle(ctx, game) {
+    ctx.textAlign = "center";
+    ctx.lineJoin = "round";
+
+    ctx.font = "900 44px 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif";
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText("ほえー、くじら！", game.width / 2, 300);
+    ctx.fillStyle = "#ffcf4f";
+    ctx.fillText("ほえー、くじら！", game.width / 2, 300);
+
+    ctx.font = "800 20px 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText("〜30秒もぐもぐチャレンジ〜", game.width / 2, 338);
+    ctx.fillStyle = "#46b8d8";
+    ctx.fillText("〜30秒もぐもぐチャレンジ〜", game.width / 2, 338);
+
+    ctx.font = "800 18px 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText("Tap / Click Start", game.width / 2, 404);
+    ctx.fillStyle = "#0d6f95";
+    ctx.fillText("Tap / Click Start", game.width / 2, 404);
+
+    const x = game.width / 2;
+    const y = 482;
+    ctx.font = "700 16px 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.fillStyle = "#12324e";
+    drawCenteredText(ctx, "長押し: 海面を移動", x, y);
+    drawCenteredText(ctx, "ダブルタップ後に長押し: 潜水", x, y + 34);
+    drawCenteredText(ctx, "海面に戻ると酸素が回復", x, y + 68);
+    ctx.textAlign = "left";
+  }
+
+  function drawCenteredText(ctx, text, x, y) {
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
   }
 
   function roundRect(ctx, x, y, width, height, radius) {

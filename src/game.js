@@ -13,9 +13,10 @@
         scale: 1,
         offsetX: 0,
         offsetY: 0,
-        timeLimit: Infinity,
-        timeLeft: Infinity,
+        timeLimit: 30,
+        timeLeft: 30,
         score: 0,
+        started: false,
         ended: false,
         lastTime: 0,
         surfaceY: 0,
@@ -58,9 +59,10 @@
         setupFoods();
       }
 
-      function resetGame() {
+      function resetGame(started = true) {
         game.timeLeft = game.timeLimit;
         game.score = 0;
+        game.started = started;
         game.ended = false;
         game.pointer.active = false;
         game.pointer.diveHold = false;
@@ -80,6 +82,7 @@
           game.foods.push(createPlankton());
         }
         game.foods.push(createKrill());
+        game.foods.push(createSquid());
       }
 
       function createPlankton() {
@@ -123,6 +126,23 @@
         return food;
       }
 
+      function createSquid() {
+        const food = {
+          type: "squid",
+          score: 30,
+          x: 0,
+          y: 0,
+          radius: 16,
+          direction: 1,
+          speed: random(74, 92),
+          active: false,
+          respawnAt: performance.now() + random(6000, 11000),
+          respawnMin: 8000,
+          respawnMax: 15000
+        };
+        return food;
+      }
+
       function placePlankton(food) {
         const margin = 32;
         const band = foodDepthBand("plankton");
@@ -143,6 +163,15 @@
         food.active = true;
       }
 
+      function spawnSquid(food) {
+        const band = foodDepthBand("squid");
+        food.direction = Math.random() < 0.5 ? -1 : 1;
+        food.x = food.direction === 1 ? -34 : game.width + 34;
+        food.y = random(band.top, band.bottom);
+        food.speed = random(74, 92);
+        food.active = true;
+      }
+
       function startKrillBurst(food) {
         food.direction = Math.random() < 0.5 ? -1 : 1;
         food.burstSpeed = random(260, 340);
@@ -154,6 +183,12 @@
 
       function foodDepthBand(type) {
         const seaDepth = game.height - game.surfaceY;
+        if (type === "squid") {
+          return {
+            top: game.surfaceY + seaDepth * 0.76,
+            bottom: game.surfaceY + seaDepth * 0.92
+          };
+        }
         if (type === "krill") {
           return {
             top: game.surfaceY + seaDepth * 0.48,
@@ -167,6 +202,10 @@
       }
 
       function respawnFood(food) {
+        if (food.type === "squid") {
+          spawnSquid(food);
+          return;
+        }
         if (food.type === "krill") {
           placeKrill(food);
           return;
@@ -185,8 +224,13 @@
 
       function onPointerDown(event) {
         event.preventDefault();
+        if (!game.started) {
+          resetGame(true);
+          return;
+        }
+
         if (game.ended) {
-          resetGame();
+          resetGame(true);
           return;
         }
 
@@ -214,6 +258,7 @@
       }
 
       function update(delta) {
+        if (!game.started) return;
         if (game.ended) return;
 
         if (Number.isFinite(game.timeLimit)) {
@@ -278,6 +323,11 @@
             continue;
           }
 
+          if (food.type === "squid") {
+            updateSquid(food, delta);
+            continue;
+          }
+
           if (food.type === "krill") {
             updateKrill(food, delta);
           } else {
@@ -296,6 +346,20 @@
               food.speed = 0;
             }
           }
+        }
+      }
+
+      function updateSquid(food, delta) {
+        food.x += food.direction * food.speed * delta;
+        food.y += Math.sin(performance.now() * 0.004 + food.x * 0.03) * delta * 10;
+        const band = foodDepthBand("squid");
+        food.y = clamp(food.y, band.top, band.bottom);
+
+        const passedRight = food.direction === 1 && food.x > game.width + 44;
+        const passedLeft = food.direction === -1 && food.x < -44;
+        if (passedRight || passedLeft) {
+          food.active = false;
+          food.respawnAt = performance.now() + random(food.respawnMin, food.respawnMax);
         }
       }
 
@@ -390,6 +454,6 @@
       canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
       resize();
-      resetGame();
+      resetGame(false);
       requestAnimationFrame(loop);
     })();
