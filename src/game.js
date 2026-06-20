@@ -224,18 +224,22 @@
 
       function onPointerDown(event) {
         event.preventDefault();
+        const pos = pointerPosition(event);
+
         if (!game.started) {
           resetGame(true);
           return;
         }
 
         if (game.ended) {
-          resetGame(true);
+          if (isRetryButtonHit(pos.x, pos.y)) {
+            resetGame(true);
+            canvas.style.cursor = "default";
+          }
           return;
         }
 
         const now = performance.now();
-        const pos = pointerPosition(event);
         game.pointer.active = true;
         game.pointer.x = pos.x;
         game.pointer.y = pos.y;
@@ -243,12 +247,38 @@
         game.pointer.lastDownAt = now;
       }
 
+      function isRetryButtonHit(x, y) {
+        const panelHeight = 190;
+        const panelY = (game.height - panelHeight) / 2;
+        const button = {
+          x: game.width / 2 - 70,
+          y: panelY + 128,
+          width: 140,
+          height: 38
+        };
+        return x >= button.x && x <= button.x + button.width && y >= button.y && y <= button.y + button.height;
+      }
+
       function onPointerMove(event) {
+        if (event.touches) {
+          if (!game.pointer.active) return;
+          event.preventDefault();
+          const pos = pointerPosition(event);
+          game.pointer.x = pos.x;
+          game.pointer.y = pos.y;
+          return;
+        }
+
+        const pos = pointerPosition(event);
+        updateCursor(pos);
         if (!game.pointer.active) return;
         event.preventDefault();
-        const pos = pointerPosition(event);
         game.pointer.x = pos.x;
         game.pointer.y = pos.y;
+      }
+
+      function updateCursor(pos) {
+        canvas.style.cursor = game.ended && isRetryButtonHit(pos.x, pos.y) ? "pointer" : "default";
       }
 
       function onPointerUp(event) {
@@ -267,6 +297,7 @@
             game.ended = true;
             game.pointer.active = false;
             game.pointer.diveHold = false;
+            canvas.style.cursor = "default";
             return;
           }
         }
