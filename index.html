@@ -70,13 +70,7 @@
           oxygen: 1,
           diving: false
         },
-        food: {
-          x: 0,
-          y: 0,
-          radius: 9,
-          direction: 1,
-          speed: 70
-        },
+        foods: [],
         bubbles: []
       };
 
@@ -98,7 +92,7 @@
         game.whale.radius = Math.max(22, Math.min(34, game.width * 0.07));
         game.whale.x = clamp(game.whale.x || game.width * 0.5, game.whale.radius, game.width - game.whale.radius);
         game.whale.y = game.whale.y || game.surfaceY;
-        placeFood();
+        setupFoods();
       }
 
       function resetGame() {
@@ -112,19 +106,109 @@
         game.whale.oxygen = 1;
         game.whale.diving = false;
         game.bubbles = [];
-        placeFood();
+        setupFoods();
         game.lastTime = performance.now();
       }
 
-      function placeFood() {
+      function setupFoods() {
         if (!game.width || !game.height) return;
-        const margin = 36;
-        const top = game.surfaceY + 54;
-        const bottom = game.height - 44;
-        game.food.x = random(margin, Math.max(margin, game.width - margin));
-        game.food.y = random(top, Math.max(top, bottom));
-        game.food.direction = Math.random() < 0.5 ? -1 : 1;
-        game.food.speed = random(48, 88);
+        game.foods = [];
+        for (let i = 0; i < 3; i += 1) {
+          game.foods.push(createPlankton());
+        }
+        game.foods.push(createKrill());
+      }
+
+      function createPlankton() {
+        const food = {
+          type: "plankton",
+          score: 1,
+          x: 0,
+          y: 0,
+          radius: random(5, 7),
+          direction: Math.random() < 0.5 ? -1 : 1,
+          speed: random(12, 24),
+          drift: random(0.6, 1.2),
+          active: true,
+          respawnAt: 0,
+          respawnMin: 850,
+          respawnMax: 1250
+        };
+        placePlankton(food);
+        return food;
+      }
+
+      function createKrill() {
+        const food = {
+          type: "krill",
+          score: 3,
+          x: 0,
+          y: 0,
+          radius: 9,
+          direction: Math.random() < 0.5 ? -1 : 1,
+          speed: 0,
+          burstSpeed: 0,
+          burstTimer: 0,
+          pauseTimer: 0,
+          drift: random(1.0, 1.6),
+          active: true,
+          respawnAt: 0,
+          respawnMin: 3000,
+          respawnMax: 5000
+        };
+        placeKrill(food);
+        return food;
+      }
+
+      function placePlankton(food) {
+        const margin = 32;
+        const band = foodDepthBand("plankton");
+        food.x = random(margin, game.width - margin);
+        food.y = random(band.top, band.bottom);
+        food.direction = Math.random() < 0.5 ? -1 : 1;
+        food.speed = random(12, 24);
+        food.active = true;
+      }
+
+      function placeKrill(food) {
+        const margin = 34;
+        const band = foodDepthBand("krill");
+        food.x = random(margin, game.width - margin);
+        food.y = random(band.top, band.bottom);
+        food.direction = Math.random() < 0.5 ? -1 : 1;
+        startKrillBurst(food);
+        food.active = true;
+      }
+
+      function startKrillBurst(food) {
+        food.direction = Math.random() < 0.5 ? -1 : 1;
+        food.burstSpeed = random(260, 340);
+        food.speed = food.burstSpeed;
+        food.burstTimer = random(0.72, 1.05);
+        food.burstDuration = food.burstTimer;
+        food.pauseTimer = 0;
+      }
+
+      function foodDepthBand(type) {
+        const seaDepth = game.height - game.surfaceY;
+        if (type === "krill") {
+          return {
+            top: game.surfaceY + seaDepth * 0.48,
+            bottom: game.surfaceY + seaDepth * 0.7
+          };
+        }
+        return {
+          top: game.surfaceY + seaDepth * 0.16,
+          bottom: game.surfaceY + seaDepth * 0.42
+        };
+      }
+
+      function respawnFood(food) {
+        if (food.type === "krill") {
+          placeKrill(food);
+          return;
+        }
+        placePlankton(food);
       }
 
       function pointerPosition(event) {
@@ -184,8 +268,12 @@
         whale.diving = canDive;
 
         if (whale.diving) {
-          whale.oxygen = Math.max(0, whale.oxygen - delta * 0.28);
-          moveToward(whale, game.pointer.x, Math.max(game.surfaceY + 42, game.pointer.y), 220 * delta);
+          whale.oxygen = Math.max(0, whale.oxygen - delta * 0.18);
+          moveTowardAxes(whale, game.pointer.x, Math.max(game.surfaceY + 42, game.pointer.y), {
+            x: 120 * delta,
+            down: 135 * delta,
+            up: 220 * delta
+          });
           if (Math.random() < delta * 6) {
             game.bubbles.push({
               x: whale.x - whale.radius * 0.45,
@@ -214,17 +302,74 @@
           }
         }
 
-        game.food.x += game.food.direction * game.food.speed * delta;
-        if (game.food.x < 28 || game.food.x > game.width - 28) {
-          game.food.x = clamp(game.food.x, 28, game.width - 28);
-          game.food.direction *= -1;
+        updateFoods(delta);
+        checkFoodCollisions();
+      }
+
+      function updateFoods(delta) {
+        for (const food of game.foods) {
+          if (!food.active) {
+            if (performance.now() >= food.respawnAt) {
+              respawnFood(food);
+            }
+            continue;
+          }
+
+          if (food.type === "krill") {
+            updateKrill(food, delta);
+          } else {
+            food.x += food.direction * food.speed * delta;
+            food.y += Math.sin(performance.now() * 0.003 * food.drift + food.x * 0.02) * delta * 8;
+          }
+
+          const band = foodDepthBand(food.type);
+          food.y = clamp(food.y, band.top, band.bottom);
+          if (food.x < 24 || food.x > game.width - 24) {
+            food.x = clamp(food.x, 24, game.width - 24);
+            food.direction *= -1;
+            if (food.type === "krill") {
+              food.pauseTimer = random(0.2, 0.45);
+              food.burstTimer = 0;
+              food.speed = 0;
+            }
+          }
+        }
+      }
+
+      function updateKrill(food, delta) {
+        if (food.pauseTimer > 0) {
+          food.pauseTimer -= delta;
+          food.speed = 0;
+          if (food.pauseTimer <= 0) {
+            startKrillBurst(food);
+          }
+          return;
         }
 
-        const dx = whale.x - game.food.x;
-        const dy = whale.y - game.food.y;
-        if (Math.hypot(dx, dy) < whale.radius * 0.72 + game.food.radius) {
-          game.score += 1;
-          placeFood();
+        food.burstTimer -= delta;
+        const progress = clamp(food.burstTimer / food.burstDuration, 0, 1);
+        food.speed = Math.max(0, food.burstSpeed * progress);
+        food.x += food.direction * food.speed * delta;
+        food.y += Math.sin(performance.now() * 0.01 + food.x * 0.08) * delta * 34;
+
+        if (food.burstTimer <= 0 || food.speed < 18) {
+          food.speed = 0;
+          food.pauseTimer = random(0.35, 0.8);
+        }
+      }
+
+      function checkFoodCollisions() {
+        const whale = game.whale;
+        for (const food of game.foods) {
+          if (!food.active) continue;
+
+          const dx = whale.x - food.x;
+          const dy = whale.y - food.y;
+          if (Math.hypot(dx, dy) < whale.radius * 0.72 + food.radius) {
+            game.score += food.score;
+            food.active = false;
+            food.respawnAt = performance.now() + random(food.respawnMin, food.respawnMax);
+          }
         }
       }
 
@@ -238,7 +383,7 @@
         ctx.translate(game.offsetX, game.offsetY);
         ctx.scale(game.scale, game.scale);
         drawWorld();
-        drawFood();
+        drawFoods();
         drawBubbles();
         drawWhale();
         drawHud();
@@ -277,27 +422,74 @@
         }
       }
 
-      function drawFood() {
+      function drawFoods() {
+        for (const food of game.foods) {
+          if (!food.active) continue;
+          if (food.type === "krill") {
+            drawKrill(food);
+          } else {
+            drawPlankton(food);
+          }
+        }
+      }
+
+      function drawPlankton(food) {
         ctx.save();
-        ctx.translate(game.food.x, game.food.y);
-        ctx.scale(game.food.direction, 1);
-        ctx.fillStyle = "#f5d05b";
-        ctx.strokeStyle = "#7a5720";
-        ctx.lineWidth = 2;
+        ctx.translate(food.x, food.y);
+        ctx.scale(food.direction, 1);
+        ctx.fillStyle = "#f7df72";
+        ctx.strokeStyle = "rgba(92, 64, 24, 0.8)";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 12, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, food.radius * 1.35, food.radius, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+
+        ctx.strokeStyle = "rgba(247, 223, 114, 0.85)";
+        ctx.lineWidth = 1.2;
+        for (let i = -1; i <= 1; i += 1) {
+          ctx.beginPath();
+          ctx.moveTo(-food.radius * 0.4, i * 2);
+          ctx.quadraticCurveTo(-food.radius * 1.4, i * 5, -food.radius * 2.2, i * 4);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = "#312610";
         ctx.beginPath();
-        ctx.moveTo(-10, 0);
-        ctx.lineTo(-20, -8);
-        ctx.lineTo(-20, 8);
-        ctx.closePath();
+        ctx.arc(food.radius * 0.55, -food.radius * 0.18, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawKrill(food) {
+        ctx.save();
+        ctx.translate(food.x, food.y);
+        ctx.scale(food.direction, 1);
+        ctx.fillStyle = "#ff7b6b";
+        ctx.strokeStyle = "#812b2b";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 15, 5.5, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#2b2418";
+
+        ctx.fillStyle = "#ffb1a6";
         ctx.beginPath();
-        ctx.arc(6, -2, 1.8, 0, Math.PI * 2);
+        ctx.ellipse(5, -0.5, 5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255, 177, 166, 0.9)";
+        ctx.lineWidth = 1.2;
+        for (let i = -1; i <= 1; i += 1) {
+          ctx.beginPath();
+          ctx.moveTo(-5, i * 2);
+          ctx.lineTo(-15, i * 4);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = "#2f1212";
+        ctx.beginPath();
+        ctx.arc(8.5, -1.4, 1.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -436,6 +628,16 @@
         }
         body.x += dx / length * distance;
         body.y += dy / length * distance;
+      }
+
+      function moveTowardAxes(body, targetX, targetY, speed) {
+        const dx = targetX - body.x;
+        const dy = targetY - body.y;
+        const stepX = Math.sign(dx) * Math.min(Math.abs(dx), speed.x);
+        const yLimit = dy > 0 ? speed.down : speed.up;
+        const stepY = Math.sign(dy) * Math.min(Math.abs(dy), yLimit);
+        body.x += stepX;
+        body.y += stepY;
       }
 
       function roundRect(x, y, width, height, radius) {
