@@ -35,7 +35,9 @@
           diving: false
         },
         foods: [],
-        bubbles: []
+        bubbles: [],
+        pickupEffects: [],
+        scorePopups: []
       };
 
       function resize() {
@@ -71,6 +73,8 @@
         game.whale.oxygen = 1;
         game.whale.diving = false;
         game.bubbles = [];
+        game.pickupEffects = [];
+        game.scorePopups = [];
         setupFoods();
         game.lastTime = performance.now();
       }
@@ -343,6 +347,7 @@
 
         updateFoods(delta);
         checkFoodCollisions();
+        updatePickupFeedback(delta);
       }
 
       function updateFoods(delta) {
@@ -425,8 +430,49 @@
           const dy = whale.y - food.y;
           if (Math.hypot(dx, dy) < whale.radius * 0.72 + food.radius) {
             game.score += food.score;
+            addPickupFeedback(food, whale);
             food.active = false;
             food.respawnAt = performance.now() + random(food.respawnMin, food.respawnMax);
+          }
+        }
+      }
+
+      function addPickupFeedback(food, whale) {
+        const isBigScore = food.score >= 30;
+        game.pickupEffects.push({
+          x: food.x,
+          y: food.y,
+          score: food.score,
+          life: isBigScore ? 0.68 : 0.42,
+          maxLife: isBigScore ? 0.68 : 0.42,
+          radius: isBigScore ? 28 : 10 + Math.min(food.score, 30) * 0.3
+        });
+        game.scorePopups.push({
+          x: whale.x,
+          y: whale.y - whale.radius - 10,
+          score: food.score,
+          text: `+${food.score}`,
+          life: isBigScore ? 1.05 : 0.78,
+          maxLife: isBigScore ? 1.05 : 0.78
+        });
+      }
+
+      function updatePickupFeedback(delta) {
+        for (let i = game.pickupEffects.length - 1; i >= 0; i -= 1) {
+          const effect = game.pickupEffects[i];
+          effect.life -= delta;
+          effect.radius += delta * 46;
+          if (effect.life <= 0) {
+            game.pickupEffects.splice(i, 1);
+          }
+        }
+
+        for (let i = game.scorePopups.length - 1; i >= 0; i -= 1) {
+          const popup = game.scorePopups[i];
+          popup.life -= delta;
+          popup.y -= delta * 34;
+          if (popup.life <= 0) {
+            game.scorePopups.splice(i, 1);
           }
         }
       }

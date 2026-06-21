@@ -28,8 +28,10 @@
     }
 
     drawFoods(ctx, game);
+    drawPickupEffects(ctx, game);
     drawBubbles(ctx, game);
     drawWhale(ctx, game);
+    drawScorePopups(ctx, game);
     drawHud(ctx, game);
     if (game.ended) drawResult(ctx, game);
     ctx.restore();
@@ -63,6 +65,56 @@
     for (let i = 0; i < 6; i += 1) {
       const x = ((performance.now() * 0.015 + i * 130) % (game.width + 140)) - 70;
       ctx.fillRect(x, game.surfaceY + 60 + i * 54, 90, 2);
+    }
+  }
+
+  function drawPickupEffects(ctx, game) {
+    for (const effect of game.pickupEffects) {
+      const alpha = Math.max(0, effect.life / effect.maxLife);
+      const progress = 1 - alpha;
+      const isBigScore = effect.score >= 30;
+      const rayCount = isBigScore ? 14 : 8;
+      const rayLength = (isBigScore ? 24 : 12) + progress * (isBigScore ? 30 : 16);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (isBigScore) {
+        const glow = ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, effect.radius * 2.1);
+        glow.addColorStop(0, "rgba(255, 255, 255, 0.65)");
+        glow.addColorStop(0.36, "rgba(255, 207, 79, 0.42)");
+        glow.addColorStop(1, "rgba(255, 207, 79, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * 2.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = effect.score >= 10 ? "#ffcf4f" : "#e8fbff";
+      ctx.lineWidth = (isBigScore ? 5 : 3) - progress * 1.5;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (isBigScore) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * 1.45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = effect.score >= 10 ? "rgba(255, 242, 168, 0.95)" : "rgba(210, 249, 255, 0.95)";
+      ctx.lineWidth = isBigScore ? 3 : 2;
+      for (let i = 0; i < rayCount; i += 1) {
+        const angle = i / rayCount * Math.PI * 2;
+        const inner = effect.radius * 0.55;
+        const outer = inner + rayLength * (i % 2 === 0 ? 1 : 0.68);
+        ctx.beginPath();
+        ctx.moveTo(effect.x + Math.cos(angle) * inner, effect.y + Math.sin(angle) * inner);
+        ctx.lineTo(effect.x + Math.cos(angle) * outer, effect.y + Math.sin(angle) * outer);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
@@ -249,6 +301,29 @@
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  function drawScorePopups(ctx, game) {
+    for (const popup of game.scorePopups) {
+      const alpha = Math.max(0, popup.life / popup.maxLife);
+      const rise = 1 - alpha;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = "center";
+      ctx.lineJoin = "round";
+      ctx.font = `900 ${popup.score >= 30 ? 32 : 22}px 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', 'Yu Gothic', system-ui, sans-serif`;
+      ctx.lineWidth = popup.score >= 30 ? 7 : 5;
+      if (popup.score >= 30) {
+        ctx.shadowColor = "rgba(255, 207, 79, 0.85)";
+        ctx.shadowBlur = 12;
+      }
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.strokeText(popup.text, popup.x, popup.y - rise * 4);
+      ctx.fillStyle = popup.score >= 10 ? "#ffcf4f" : popup.score >= 3 ? "#ff9b6b" : "#f7fbff";
+      ctx.fillText(popup.text, popup.x, popup.y - rise * 4);
+      ctx.restore();
+    }
   }
 
   function drawHud(ctx, game) {
