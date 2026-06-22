@@ -349,8 +349,9 @@
     ctx.fillStyle = "rgba(5, 22, 36, 0.58)";
     roundRect(ctx, pad, y, barWidth, 18, 7);
     ctx.fill();
-    ctx.fillStyle = game.whale.oxygen < 0.22 ? "#ff8b73" : "#8ce7ff";
-    roundRect(ctx, pad + 3, y + 3, Math.max(0, (barWidth - 6) * game.whale.oxygen), 12, 5);
+    const oxygenRatio = Math.max(0, Math.min(1, game.whale.oxygen / game.whale.oxygenMax));
+    ctx.fillStyle = oxygenRatio < 0.22 ? "#ff8b73" : "#8ce7ff";
+    roundRect(ctx, pad + 3, y + 3, Math.max(0, (barWidth - 6) * oxygenRatio), 12, 5);
     ctx.fill();
   }
 

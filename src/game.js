@@ -31,7 +31,8 @@
           x: 0,
           y: 0,
           radius: 28,
-          oxygen: 1,
+          oxygen: 1.2,
+          oxygenMax: 1.2,
           diving: false
         },
         foods: [],
@@ -70,7 +71,7 @@
         game.pointer.diveHold = false;
         game.whale.x = game.width * 0.5;
         game.whale.y = game.surfaceY;
-        game.whale.oxygen = 1;
+        game.whale.oxygen = game.whale.oxygenMax;
         game.whale.diving = false;
         game.bubbles = [];
         game.pickupEffects = [];
@@ -329,7 +330,7 @@
           const targetX = game.pointer.active ? game.pointer.x : whale.x;
           moveToward(whale, targetX, game.surfaceY, 250 * delta);
           if (whale.y <= game.surfaceY + 1) {
-            whale.oxygen = Math.min(1, whale.oxygen + delta * 0.42);
+            whale.oxygen = Math.min(whale.oxygenMax, whale.oxygen + delta * 0.42);
           }
         }
 
