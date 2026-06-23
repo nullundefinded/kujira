@@ -4,6 +4,10 @@
     krill: loadImage("assets/images/krill.png"),
     squid: loadImage("assets/images/squid.png")
   };
+  const whaleImage = loadImage("assets/images/whale.png");
+  const whaleTiredImage = loadImage("assets/images/whale-tired.png");
+  const spoutImage = loadImage("assets/images/spout.png");
+  const LOW_OXYGEN_RATIO = 0.22;
 
   function loadImage(src) {
     const image = new Image();
@@ -31,6 +35,7 @@
     drawPickupEffects(ctx, game);
     drawBubbles(ctx, game);
     drawWhale(ctx, game);
+    drawSpouts(ctx, game);
     drawScorePopups(ctx, game);
     drawHud(ctx, game);
     if (game.ended) drawResult(ctx, game);
@@ -257,6 +262,42 @@
     ctx.globalAlpha = 1;
   }
 
+  function drawSpouts(ctx, game) {
+    for (const spout of game.spouts) {
+      const alpha = Math.max(0, spout.life / spout.maxLife);
+      const progress = 1 - alpha;
+      const grow = easeOutBack(Math.min(1, progress / 0.45));
+      const fade = alpha < 0.28 ? alpha / 0.28 : 1;
+      const width = game.whale.radius * (0.58 + grow * 1.82);
+      const imageReady = spoutImage.complete && spoutImage.naturalWidth > 0;
+      const height = imageReady ? width * spoutImage.naturalHeight / spoutImage.naturalWidth : width * 0.9;
+
+      ctx.save();
+      ctx.globalAlpha = fade * 0.95;
+      if (imageReady) {
+        ctx.drawImage(spoutImage, spout.x - width / 2, spout.y - height - grow * 4, width, height);
+      } else {
+        drawFallbackSpout(ctx, spout, width, height);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawFallbackSpout(ctx, spout, width, height) {
+    ctx.fillStyle = "#62d8f5";
+    ctx.beginPath();
+    ctx.ellipse(spout.x, spout.y - height * 0.56, width * 0.12, height * 0.45, 0, 0, Math.PI * 2);
+    ctx.ellipse(spout.x - width * 0.28, spout.y - height * 0.44, width * 0.22, height * 0.12, -0.45, 0, Math.PI * 2);
+    ctx.ellipse(spout.x + width * 0.28, spout.y - height * 0.44, width * 0.22, height * 0.12, 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function easeOutBack(t) {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
   function drawWhale(ctx, game) {
     const whale = game.whale;
     const facing = game.pointer.active && game.pointer.x < whale.x ? -1 : 1;
@@ -265,6 +306,11 @@
     ctx.save();
     ctx.translate(whale.x, whale.y + bob);
     ctx.scale(facing, 1);
+
+    if (drawWhaleImage(ctx, whale)) {
+      ctx.restore();
+      return;
+    }
 
     ctx.fillStyle = "#254f78";
     ctx.strokeStyle = "#0d2946";
@@ -301,6 +347,23 @@
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  function drawWhaleImage(ctx, whale) {
+    const oxygenRatio = Math.max(0, Math.min(1, whale.oxygen / whale.oxygenMax));
+    const preferredImage = oxygenRatio < LOW_OXYGEN_RATIO ? whaleTiredImage : whaleImage;
+    const image = preferredImage.complete && preferredImage.naturalWidth > 0 ? preferredImage : whaleImage;
+    if (!image.complete || image.naturalWidth === 0) return false;
+
+    const width = whale.radius * 4.1;
+    const height = width * image.naturalHeight / image.naturalWidth;
+    const yOffset = -whale.radius * 0.28;
+
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(image, -width / 2, -height / 2 + yOffset, width, height);
+    ctx.restore();
+    return true;
   }
 
   function drawScorePopups(ctx, game) {
@@ -350,7 +413,7 @@
     roundRect(ctx, pad, y, barWidth, 18, 7);
     ctx.fill();
     const oxygenRatio = Math.max(0, Math.min(1, game.whale.oxygen / game.whale.oxygenMax));
-    ctx.fillStyle = oxygenRatio < 0.22 ? "#ff8b73" : "#8ce7ff";
+    ctx.fillStyle = oxygenRatio < LOW_OXYGEN_RATIO ? "#ff8b73" : "#8ce7ff";
     roundRect(ctx, pad + 3, y + 3, Math.max(0, (barWidth - 6) * oxygenRatio), 12, 5);
     ctx.fill();
   }

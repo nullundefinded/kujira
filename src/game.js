@@ -33,10 +33,12 @@
           radius: 28,
           oxygen: 1.2,
           oxygenMax: 1.2,
-          diving: false
+          diving: false,
+          lowOxygenDive: false
         },
         foods: [],
         bubbles: [],
+        spouts: [],
         pickupEffects: [],
         scorePopups: []
       };
@@ -73,7 +75,9 @@
         game.whale.y = game.surfaceY;
         game.whale.oxygen = game.whale.oxygenMax;
         game.whale.diving = false;
+        game.whale.lowOxygenDive = false;
         game.bubbles = [];
+        game.spouts = [];
         game.pickupEffects = [];
         game.scorePopups = [];
         setupFoods();
@@ -313,6 +317,9 @@
 
         if (whale.diving) {
           whale.oxygen = Math.max(0, whale.oxygen - delta * 0.18);
+          if (whale.oxygen <= whale.oxygenMax * 0.5) {
+            whale.lowOxygenDive = true;
+          }
           moveTowardAxes(whale, game.pointer.x, Math.max(game.surfaceY + 42, game.pointer.y), {
             x: 120 * delta,
             down: 135 * delta,
@@ -330,6 +337,10 @@
           const targetX = game.pointer.active ? game.pointer.x : whale.x;
           moveToward(whale, targetX, game.surfaceY, 250 * delta);
           if (whale.y <= game.surfaceY + 1) {
+            if (whale.lowOxygenDive) {
+              addSpout(whale);
+              whale.lowOxygenDive = false;
+            }
             whale.oxygen = Math.min(whale.oxygenMax, whale.oxygen + delta * 0.42);
           }
         }
@@ -348,7 +359,29 @@
 
         updateFoods(delta);
         checkFoodCollisions();
+        updateSpouts(delta);
         updatePickupFeedback(delta);
+      }
+
+      function addSpout(whale) {
+        const life = 0.82;
+        game.spouts.push({
+          x: whale.x,
+          y: whale.y - whale.radius * 1.00,
+          life,
+          maxLife: life
+        });
+      }
+
+      function updateSpouts(delta) {
+        for (let i = game.spouts.length - 1; i >= 0; i -= 1) {
+          const spout = game.spouts[i];
+          spout.life -= delta;
+          spout.y -= delta * 8;
+          if (spout.life <= 0) {
+            game.spouts.splice(i, 1);
+          }
+        }
       }
 
       function updateFoods(delta) {
